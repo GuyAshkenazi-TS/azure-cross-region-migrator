@@ -1,66 +1,71 @@
-# Azure Cross-Region VM Migrator
+# Azure VM Cross-Region Migrator (v2.6)
 
-A Bash script to automate the migration of Azure Virtual Machines from one region to another.
-This tool handles the snapshotting, copying, and recreation of VMs while addressing common deployment failures related to Availability Zones and Network Security Groups.
+A professional Bash script designed to automate the migration of Azure Virtual Machines between different regions. This tool is specifically engineered to handle complex scenarios such as **L-Series/NVMe-based VMs**, **Trusted Launch** security configurations, and cross-region synchronization delays.
 
-## 🚀 Key Features (v2.0)
 
-* **Cross-Region Migration:** Moves VMs (including L-Series/NVMe supported sizes) between any Azure regions.
-* **Availability Zone Safe:** Automatically handles VM creation without forcing source Availability Zones, preventing `ZonalAllocationFailed` errors in target regions.
-* **Connectivity Ready:** Automatically opens **Port 22 (SSH)** in the new Network Security Group (NSG) to prevent lockout.
-* **Zero Data Loss:** Uses incremental snapshots to copy OS disks securely.
-* **Non-Destructive:** The source VM is **not deleted**, ensuring a safe fallback.
+
+## ✨ Key Features (v2.6)
+
+* **Real-Time Progress Monitoring:** Features a visual progress bar during snapshot transfers to keep the user informed.
+* **30-Second Heartbeat:** Provides periodic "still working" status updates even when the transfer percentage remains unchanged, ensuring the session remains active and transparent.
+* **Detailed Timestamps:** Logs the exact start time for every step in the migration process.
+* **Automatic Duration Tracking:** Calculates and displays the total execution time for each individual step and the overall process.
+* **Trusted Launch Support:** Utilizes incremental snapshots required for modern Azure security standards.
+* **Auto-SSH Readiness:** Automatically provisions a Network Security Group (NSG) and opens Port 22 (SSH) to ensure immediate connectivity after migration.
+* **Capacity-Aware Deployment:** Recreates the VM without forcing specific Availability Zones to avoid capacity restriction errors in the target region.
 
 ## 📋 Prerequisites
 
-1.  **Azure CLI:** Make sure you have `az` installed and logged in (`az login`).
-2.  **Target Network:** You must have a VNet and Subnet created in the target region before running the script.
-3.  **Permissions:** Contributor access to both source and target Resource Groups.
+**CRITICAL:** The script assumes that the target network infrastructure is already in place. Before running the script, ensure the following resources exist in your target region:
 
-## 🛠️ Usage
+1. **Target Resource Group:** A container for your new resources.
+2. **Target VNet & Subnet:** A virtual network and at least one active subnet (e.g., named `default`).
 
-Make the script executable:
+### Example: Preparing the Target Environment (Azure CLI)
+```bash
+# 1. Create the Target Resource Group
+az group create --name Lab-Target-RG --location eastus2
+
+# 2. Create the Target VNet and Subnet
+az network vnet create \
+  --resource-group Lab-Target-RG \
+  --name Vnet-Target \
+  --location eastus2 \
+  --address-prefix 10.5.0.0/16 \
+  --subnet-name default \
+  --subnet-prefix 10.5.1.0/24
+```
+
+  🛠️ How to Use
+1. Grant Execution Permissions:
 ```bash
 chmod +x vm-move.sh
 ```
-״״
-Run the script with the following arguments:
+2. Run the Script:
 
-```bash
-./vm-move.sh <SOURCE_VM_ID> <TARGET_REGION> <TARGET_RG> <TARGET_VNET> <TARGET_SUBNET>
+```bash 
+./vm-move.sh <SOURCE_VM_ID> <TARGET_REGION> <TARGET_RG> <TARGET_VNET_NAME> <TARGET_SUBNET_NAME>
 ```
 
-Example:
 
-```bash
+Execution Example:
+```bash 
 ./vm-move.sh \
-  "/subscriptions/xxxxx/resourceGroups/SourceRG/providers/Microsoft.Compute/virtualMachines/MyVM" \
+  "/subscriptions/xxxx-xxxx-xxxx/resourceGroups/SourceRG/providers/Microsoft.Compute/virtualMachines/MyVM" \
   "eastus2" \
-  "TargetRG" \
-  "vnet-target" \
+  "Lab-Target-RG" \
+  "Vnet-Target" \
   "default"
   ```
 
+## ⚠️ Important Warnings & Limitations
+Network Security Groups (NSG): The script creates a basic NSG and opens Port 22 only. Complex rules, such as specific IP whitelists or Application Security Groups (ASGs), are NOT copied and must be recreated manually.
 
+Source VM Downtime: The source VM will be Deallocated (stopped) during the process to ensure 100% data consistency.
 
+Private IP Changes: The VM will receive a new internal IP address from the target subnet's range.
 
-⚠️ Important Limitations & Warnings
-1. Network Security Groups (NSG)
-The script creates a basic NSG and automatically opens SSH (Port 22).
+Snapshot Retention: Source snapshots are not deleted automatically; they should be kept as a backup for a "cooling period" before manual deletion.
 
-CRITICAL: Complex firewall rules (Allow/Deny specific IPs, ASGs) from the source are NOT copied automatically. You must verify and recreate specific security rules manually after migration.
-
-2. Private IPs
-The new VM will receive a new Private IP address assigned by the target subnet. Static Private IPs are not preserved.
-
-3. Source VM
-The source VM is deallocated (stopped) but NOT deleted.
-
-Recommendation: Keep the source VM for at least 7 days as a backup before manual deletion.
-
-📝 License
-This script is provided "as is" without warranty of any kind. Use at your own risk.
-
-
-
-
+## 📝 License
+This script is provided "as is" without warranty of any kind. It is highly recommended to perform a test run in a development/lab environment before migrating production workloads.
